@@ -1,15 +1,10 @@
-import {
-  Component,
-  ElementRef,
-  effect,
-  signal,
-  viewChild,
-} from '@angular/core';
+import { Component, ElementRef, effect, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { MqttClient } from 'mqtt';
 import * as mqttLib from 'mqtt';
 
+// Works whichever way the installed mqtt bundle exposes `connect`.
 const mqtt: any = (mqttLib as any).default ?? mqttLib;
 
 interface Msg {
@@ -40,6 +35,7 @@ export class Demo {
   joined = signal(false);
   status = signal<'connecting' | 'online' | 'offline'>('connecting');
   messages = signal<Msg[]>([]);
+  toast = signal('');
 
   private client?: MqttClient;
   private topic = '';
@@ -48,6 +44,15 @@ export class Demo {
   private list = viewChild<ElementRef<HTMLElement>>('list');
 
   constructor() {
+    try {
+      this.name = localStorage.getItem('chat-name') ?? '';
+      this.room = localStorage.getItem('chat-room') ?? 'lobby';
+    } catch {
+      /* storage unavailable */
+    }
+    // Invite links look like  https://.../?room=friends  and pre-fill the room.
+    const r = new URLSearchParams(location.search).get('room');
+    if (r) this.room = r;
     effect(() => {
       this.messages();
       setTimeout(() => {
@@ -61,12 +66,14 @@ export class Demo {
     const name = this.name.trim().slice(0, 24);
     if (!name) return;
     this.name = name;
-    const room =
-      this.room
-        .toLowerCase()
-        .replace(/[^a-z0-9_-]/g, '')
-        .slice(0, 30) || 'lobby';
+    const room = this.room.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30) || 'lobby';
     this.room = room;
+    try {
+      localStorage.setItem('chat-name', name);
+      localStorage.setItem('chat-room', room);
+    } catch {
+      /* storage unavailable */
+    }
     this.topic = `${NAMESPACE}/${room}`;
     this.joined.set(true);
     this.status.set('connecting');
@@ -99,7 +106,7 @@ export class Demo {
         const m = JSON.parse(new TextDecoder().decode(payload)) as Msg;
         if (!m?.id || typeof m.text !== 'string') return;
         this.messages.update((list) =>
-          list.some((x) => x.id === m.id) ? list : [...list, m].slice(-300)
+          list.some((x) => x.id === m.id) ? list : [...list, m].slice(-300),
         );
       } catch {
         /* ignore malformed packets */
@@ -123,6 +130,30 @@ export class Demo {
     this.joined.set(false);
   }
 
+  async invite() {
+    const url = `${location.origin}${location.pathname}?room=${this.room}`;
+    const text = `Join my chat room "${this.room}"`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Open chat', text, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        this.toast.set('Invite link copied');
+        setTimeout(() => this.toast.set(''), 2000);
+      }
+    } catch {
+      /* user cancelled sharing */
+    }
+  }
+
+  // Show the sender's name only on the first bubble of a run from the same person.
+  showName(i: number) {
+    const list = this.messages();
+    const m = list[i];
+    const prev = list[i - 1];
+    return !this.isMine(m) && (!prev || prev.type === 'sys' || prev.cid !== m.cid);
+  }
+
   isMine(m: Msg) {
     return m.cid === this.cid;
   }
@@ -135,14 +166,7 @@ export class Demo {
   }
 
   private make(type: Msg['type'], text: string): Msg {
-    return {
-      id: crypto.randomUUID(),
-      cid: this.cid,
-      type,
-      name: this.name,
-      text,
-      ts: Date.now(),
-    };
+    return { id: crypto.randomUUID(), cid: this.cid, type, name: this.name, text, ts: Date.now() };
   }
 
   private publish(m: Msg) {
