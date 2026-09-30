@@ -28,7 +28,7 @@
             "assets": [],
             "index": "src/index.html",
             "browser": "src/main.ts",
-            "outputPath": "dist/demo",
+            "outputPath": { "base": "docs", "browser": "" },
             "polyfills": [],
             "scripts": [],
             "styles": ["src/global_styles.css"],
