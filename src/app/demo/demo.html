@@ -1,0 +1,52 @@
+@if (!joined()) {
+  <main class="join">
+    <h1>Open chat</h1>
+    <p>Type your name to join. Anyone who enters the same room can talk with you.</p>
+    <form (ngSubmit)="join()">
+      <label>
+        Your name
+        <input name="name" [(ngModel)]="name" maxlength="24" autocomplete="nickname" autofocus />
+      </label>
+      <label>
+        Room
+        <input name="room" [(ngModel)]="room" maxlength="30" />
+      </label>
+      <button type="submit" [disabled]="!name.trim()">Join chat</button>
+    </form>
+    <small>Messages pass through a public relay and are not private. Don't share secrets.</small>
+  </main>
+} @else {
+  <main class="chat">
+    <header>
+      <div>
+        <strong>#{{ room }}</strong>
+        <span class="status" [class.on]="status() === 'online'">
+          {{ status() === 'online' ? 'Connected' : status() === 'connecting' ? 'Connecting…' : 'Offline, retrying' }}
+        </span>
+      </div>
+      <button type="button" class="ghost" (click)="leave()">Leave</button>
+    </header>
+
+    <section class="list" #list aria-live="polite">
+      @if (messages().length === 0) {
+        <p class="empty">No messages yet. Say hello, then share this page's link with a friend.</p>
+      }
+      @for (m of messages(); track m.id) {
+        @if (m.type === 'sys') {
+          <p class="sys">{{ m.text }}</p>
+        } @else {
+          <article class="msg" [class.mine]="isMine(m)">
+            <span class="who" [style.color]="'hsl(' + hue(m.name) + ' 55% 38%)'">{{ isMine(m) ? 'You' : m.name }}</span>
+            <p>{{ m.text }}</p>
+            <time>{{ m.ts | date: 'shortTime' }}</time>
+          </article>
+        }
+      }
+    </section>
+
+    <form class="composer" (ngSubmit)="send()">
+      <input name="draft" [(ngModel)]="draft" maxlength="1000" placeholder="Write a message" autocomplete="off" />
+      <button type="submit" [disabled]="!draft.trim() || status() !== 'online'">Send</button>
+    </form>
+  </main>
+}
