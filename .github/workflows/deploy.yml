@@ -1,0 +1,53 @@
+name: Deploy Angular to GitHub Pages
+
+on:
+  push:
+    branches: [main, master, TestNew]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npx ng build --configuration production --base-href "/${{ github.event.repository.name }}/" --output-path dist/site
+
+      - name: Find build output
+        run: |
+          if [ -f dist/site/browser/index.html ]; then
+            echo "OUT=dist/site/browser" >> "$GITHUB_ENV"
+          else
+            echo "OUT=dist/site" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ env.OUT }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
