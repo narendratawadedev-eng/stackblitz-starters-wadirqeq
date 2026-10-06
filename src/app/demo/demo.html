@@ -37,7 +37,36 @@
         @if (m.type === 'sys') {
           <p class="notice">{{ m.text }}</p>
         } @else {
-          @let first = i === 0 || messages()[i - 1].type === 'sys' || messages()[i - 1].cid !== m.cid;
-          <article class="msg" [class.mine]="isMine(m)" [class.first]="first">
-            @if (first && !isMine(m)) {
+          <article class="msg" [class.mine]="isMine(m)" [class.first]="(i === 0 || messages()[i - 1].type === 'sys' || messages()[i - 1].cid !== m.cid)">
+            @if (!isMine(m) && (i === 0 || messages()[i - 1].type === 'sys' || messages()[i - 1].cid !== m.cid)) {
               <span class="who" [style.color]="'hsl(' + hue(m.name) + ' 60% 38%)'">{{ m.name }}</span>
+            }
+            <span class="text">{{ m.text }}</span>
+            <time>{{ m.ts | date: 'shortTime' }}</time>
+          </article>
+        }
+      }
+    </section>
+
+    <form class="composer" (ngSubmit)="send()">
+      <input
+        name="draft"
+        [(ngModel)]="draft"
+        maxlength="1000"
+        placeholder="Message"
+        autocomplete="off"
+        enterkeyhint="send"
+        aria-label="Message"
+      />
+      <button
+        type="submit"
+        class="send"
+        (pointerdown)="$event.preventDefault()"
+        [disabled]="!draft.trim() || status() !== 'online'"
+        aria-label="Send"
+      >
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M2 21 23 12 2 3v7l15 2-15 2z" /></svg>
+      </button>
+    </form>
+  </main>
+}
